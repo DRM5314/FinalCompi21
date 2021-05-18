@@ -1,0 +1,75 @@
+package reportes;
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import java.util.List;
+
+parser code{:
+public parser(lexico entrada){
+	super(entrada);		
+}
+
+public void report_error(String message, Object info) {
+	StringBuffer m = new StringBuffer("Error");
+	if(info instanceof java_cup.runtime.Symbol){
+		java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+		if(s.left >=0){
+			m.append("en linea "+(s.left+1));
+			if(s.right >=0){
+				m.append("columna "+(s.right+1));
+			}
+		}
+		m.append(": "+message);
+	}
+	//System.out.println(m);
+}
+public void syntax_error(Symbol cur_token){
+	String salida = "Error sintactico token : "+symbl_name_from_id(cur_token.sym);	
+    salida+=" Fila: "+(cur_token.left+1);
+    salida+=" Columna: "+(cur_token.right+1);
+    if(cur_token.value!=null)salida+=" Valor: "+cur_token.value.toString();
+    //reporte.agregarReporte("error",salida);
+    //Systemm.out.println(salida);
+}
+public void report_fatal_error(String message, Object info) {
+	//Systemm.out.println("Error sin recuperacion");
+}
+private List <String> parametrosSolicitud = new ArrayList<>();
+private List<Integer> datosSolicitud = new ArrayList<>();
+
+private void limpiarAuxiliares(){
+	parametrosSolicitud.clear();
+	datosSolicitud.clear();
+}
+Reporte parserRerportes = new Reporte();
+public Reporte getParserReportes (){
+	return this.parserRerportes;
+}
+:}
+
+non terminal S0,S1,S2;
+
+terminal DOS_PUNTOS,COMA,LLAVE_ABIERTA,LLAVE_CERRADA,FALLAS,ACIERTOS,USOS;
+
+terminal Integer NUMERO;
+
+start with S0;
+
+S0 ::= LLAVE_ABIERTA S1 LLAVE_CERRADA {:
+		parserRerportes.parserEntrada(parametrosSolicitud,datosSolicitud);
+	:};
+
+S1 ::= S1 COMA S2 | S2;
+
+S2 ::= FALLAS DOS_PUNTOS NUMERO:B {:
+			parametrosSolicitud.add("FALLAS");
+			datosSolicitud.add(B);			
+		:}
+	|ACIERTOS DOS_PUNTOS NUMERO:B {:
+			parametrosSolicitud.add("ACIERTOS");
+			datosSolicitud.add(B);			
+		:}
+	|USOS DOS_PUNTOS NUMERO:B {:
+			parametrosSolicitud.add("USOS");
+			datosSolicitud.add(B);			
+		:}
+	;

@@ -1,0 +1,1027 @@
+package analizador;
+//package pruebasproyecto2;
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import java.util.List;
+import cic.ManejadorEstructura;
+import lexema.Lexema;
+import scripting.Manejador;
+import variable.Variable;
+parser code{:
+//private Reportes reporte;
+private ManejadorEstructura manejadorEtiquetas;
+public parser(lexico entrada,ManejadorEstructura entrada1){
+	super(entrada);
+	manejadorEtiquetas = entrada1;
+	//Reportes reporteEntrada	
+	//reporte = reporteEntrada;
+}
+public void report_error(String message, Object info) {
+	errorSintactco = true;
+	StringBuffer m = new StringBuffer("Error");
+	if(info instanceof java_cup.runtime.Symbol){
+		java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+		int posxy [] =new int[2];
+		int linea = 0,columna = 0;
+		if(s.left >=0){
+			//m.append("en linea ");
+			linea = (s.left+1);
+			if(s.right >=0){
+				//m.append("columna "+(s.right+1));
+				columna = (s.right+1);
+			}
+		}
+		m.append(": "+message);		
+		manejadorEtiquetas.agregarError("sintactico",m.toString(),new int []{linea,columna});
+	}
+	reserErrores();
+}
+
+public void reserErrores(){
+	limpiarAuxiliares(); 
+	manejadorEtiquetas.manejadorScript().resetBloque();   
+	manejadorEtiquetas.manejadorScript().resetOperacion();
+}
+
+public void syntax_error(Symbol cur_token){
+	errorSintactco = true;
+    List<Integer> ids = this.expected_token_ids();
+    String salida = "Error sintactico token :"+symbl_name_from_id(cur_token.sym);
+    if(cur_token.value!=null)salida+=" Valor: "+cur_token.value.toString();
+    if(ids.size()>0){
+        salida+="\n Se esperaba: ";
+        for (Integer e:ids){
+        salida+= symbl_name_from_id(e)+",\n";
+        }
+    }
+    //reporte.agregarError("sintactico",salida,(cur_token.left+1),(cur_token.right+1));
+	manejadorEtiquetas.agregarError("sintactico",salida,new int []{(cur_token.left+1),(cur_token.right+1)});
+    reserErrores();
+}
+public void report_fatal_error(String message, Object info){
+	errorSintactco = true;
+	//System.out.println("Error irrecuperable");
+	reserErrores();
+}
+private List <String> parametros = new ArrayList<>();
+private List<String> datosParametros = new ArrayList<>();
+private List<String> ids = new ArrayList<>();
+private Lexema lexemaAux = null;
+private boolean existeOnload = false;
+private int contadorOnload = 1;
+//private List<Solicitudes> solicitudes = new ArrayList<>();
+private boolean errorSintactco = false;
+
+/*
+public List<Solicitudes> getSolicitudes(){
+	return this.solicitudes;
+}
+*/
+private void limpiarAuxiliares(){
+	parametros.clear();
+	datosParametros.clear();
+	repetidos = false;
+}
+private boolean repetidos = false;
+private void agregarDatos(String tipo,String dato){
+	if(!parametros.contains(tipo)){
+		parametros.add(tipo);
+		datosParametros.add(dato);
+	}else repetidos = true;	
+}
+
+private void agregarEtiqueta(String tipo,int px,int py,String textoEtiquetas){
+	//agregarEtiqueta(String tipoEtiqueta, List<String> parametros, List<String> datosParametros, String texto)
+	int posXY [] = {px+1,py+1};
+	if(!repetidos){
+		// contieneId -1 si no contiene, caso contrario da la posicion
+		int contieneId = parametros.indexOf("ID");
+		if(contieneId >=0){
+			String nombreId = datosParametros.get(contieneId);
+			if(!ids.contains(nombreId)){
+				manejadorEtiquetas.agregarEtiqueta(tipo,parametros,datosParametros,textoEtiquetas,posXY);
+				ids.add(nombreId);
+			}else {				
+				manejadorEtiquetas.agregarError("Semantico","Id ----->\""+nombreId+"\"<----- ya existe en otra etiqueta",posXY);
+			}
+		}else{
+			manejadorEtiquetas.agregarEtiqueta(tipo,parametros,datosParametros,textoEtiquetas,posXY);
+		}
+	}else{
+		//agregarError(String tipo, String info, int[] posXY)
+		manejadorEtiquetas.agregarError("Semantico","Parametros repetidos",posXY);
+	}
+	limpiarAuxiliares();
+}
+
+private void setDatosCig(int posx,int posy){
+	int posXY [] = {posx,posy};
+	int posId = parametros.indexOf("ID");
+	String id="",name="";
+	if(posId>=0)id = datosParametros.get(posId);
+	int posName = parametros.indexOf("NAME");
+	if(posName>=0)name = datosParametros.get(posName);	
+	//setDatosCig(String id, String name)
+	if(!manejadorEtiquetas.existeCaptcha(id)){
+		manejadorEtiquetas.setDatosCig(id,name);
+	}else {
+		manejadorEtiquetas.agregarError("Semantico","Captcha ya existe con ese id: "+id,posXY);
+	}
+	limpiarAuxiliares();
+}
+
+private void verificadorOperaciones(Lexema parteIzquierda, String tipoOperacion, Lexema parteDerecha, int posX, int posY) {
+        if(!errorSintactco){
+			boolean auxError = false;
+			String info = "";
+			if (parteIzquierda != null && parteDerecha != null) {
+				String resultadoOperacion = manejadorEtiquetas.manejadorScript().resultadoOperacion(parteIzquierda, tipoOperacion, parteDerecha);
+				if (resultadoOperacion != null) {
+					tipoOperacion = manejadorEtiquetas.manejadorScript().cambiosOperacion(parteIzquierda,tipoOperacion,parteDerecha);
+					manejadorEtiquetas.manejadorScript().operar(parteIzquierda, tipoOperacion, parteDerecha);
+				} else {
+					auxError = true;
+					info = "Operacion no valida, no se puede operar " + parteIzquierda.getTipo() + " con " + parteDerecha.getTipo() + " con el operador " + tipoOperacion;
+				}
+			} else {
+				auxError = true;
+				info = "Operacion no valida, no se puede operar realizar operacion con  "+tipoOperacion;
+			}
+			if (auxError) {
+				int posXY[] = {posX + 1, posY + 1};
+				manejadorEtiquetas.manejadorScript().errorOperar(true);
+				System.out.println("Ocurrio error en asignacion de varible en " + tipoOperacion);            
+				manejadorEtiquetas.agregarError("Semantico", info, posXY);
+			}
+		}else {			
+			//manejadorEtiquetas.agregarError("Semantico", "Corrija error sintactico antes de operar", posXY);
+		}
+    }
+
+	private void verificadorOperaciones(String tipoOperacion, Lexema parteDerecha, int posX, int posY) {
+        if(!errorSintactco){
+			boolean auxError = false;
+			String info = "";
+			if (parteDerecha != null) {
+				String resultadoOperacion = manejadorEtiquetas.manejadorScript().resultadoOperacion(tipoOperacion, parteDerecha);
+				if (resultadoOperacion != null) {                
+					manejadorEtiquetas.manejadorScript().operar(tipoOperacion, parteDerecha);
+				} else {
+					auxError = true;
+					info = "Operacion no valida, no se puede operar con " + parteDerecha.getTipo() + " con el operador " + tipoOperacion;
+				}
+			} else {
+				auxError = true;
+				info = "Operacion no valida, no se puede operar realizar operacion con  "+tipoOperacion;
+			}
+			if (auxError) {
+				int posXY[] = {posX + 1, posY + 1};
+				manejadorEtiquetas.manejadorScript().errorOperar(true);
+				System.out.println("Ocurrio error en asignacion de varible en " + tipoOperacion);            
+				manejadorEtiquetas.agregarError("Semantico", info, posXY);
+			}
+		}else {
+			int posXY[] = {posX + 1, posY + 1};
+			manejadorEtiquetas.agregarError("Semantico", "Corrija error sintactico antes de operar", posXY);
+		}
+    }
+
+	private String getValor(Lexema entrada){
+		if(entrada.getNombreVariable()!=null){
+			return entrada.getNombreVariable();
+		}else{
+			return entrada.getValor();
+		}
+	}
+:}
+
+non terminal S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,S10,S11,S12,S13,S14,S15,S16,S17,S19,S20,S21,S22,S24,S25
+	,CIERRE,OPCIONES_BLOQUE;
+
+non terminal Lexema S23,S26,OPCION_RESTA;
+
+non terminal String [] ASIGNACIONES_DECLARACIONES,DECLARACION,ASIGNACION,S18;
+
+non terminal OPCIONES_IF,INICIO_IF,WHILE_PROD,REPEAT_PROD,INICIO_REPEAT,INICIO_BLOQUE,FIN_BLOQUE,EXIT_PROD,REDIRECT_PROD,ALERT_INFO_PROD,OPCIONES_INSERT,OPCION_INSERT;
+
+//parametros en forma no terminaLinal para cada etiqueta
+non terminal PCIG,PCIGS,PLINK,PBODY,PSPAM,PSPAMS,PINPUT,PINPUTS,PTEXTEAREA,PTEXTEAREAS
+	,PDIV,PDIVS,PIMG,PIMGS,PBUTTON,PBUTTONS,P_SELECT_P_H1_SPAMS,PPSH,TIPOS_SIZE;
+
+//parametros comunes noterminal
+
+non terminal fonts,font,icfs,icf,OPCION_TEXTO;
+
+terminal MENOR_QUE,MAYOR_QUE,DIAGONAL,CORCHETE_ABIERTO,CORCHETE_CERRADO,PARENTESIS_ABIERTO,PARENTESIS_CERRADO
+	,COMA,IGUAL,C_GCIC,C_HEAD,C_TITLE,C_LINK,LINK_PARAMETRO,C_BODY,C_SPAM,C_INPUT,C_TEXTAREA
+	,C_SELECT,C_OPTION,C_DIV,C_IMG,C_BR,C_BUTTON,C_H1,C_P,C_SCRIPTING,ID,NAME,BACKGROUND,COLOR,COLOR_PARAMETRO
+	,FONT_SIZE,FONT_FAMILY,TEXT_ALIGN,TYPE,COLS,ROWS,ENTERO,CLASS,SRC,WIDTH,HEIGHT,ALT,ONCLICK,HREF
+	,SIZE_PARAMETRO_IMAGEN,SIZE_PARAMETRO,FAMILY_PARAMETRO,ALING_PARAMETRO,TYPE_PARAMETRO
+	,NOMBRE_FUNCION_PARAMETRO;
+
+terminal String TEXTO_ETIQUETA,ID_PARAMETRO,ID_PARAMETRO_ELEMENT,ID_PARAMETRO_INSERT;
+
+terminal IGUAL_IGUAL,DIFERENTE,MENOR_IGUAL,MAYOR_IGUAL;
+
+//Terminales de funciones en scripting
+
+terminal TIPOS_DATOS,ID_VARIABLE,GLOBAL;
+
+terminal NOMBRE_FUNCION,ON_LOAD,ASC,DESC,LETPAR_NUM,LETIMPAR_NUM,REVERSE,CARACTER_ALEATORIO,NUM_ALEATORIO,ALERT_INFO,EXIT,REDIRECT,INSERT,GET_ELEMENT_BY_ID;
+
+//Terminales de sentencias y ciclos
+
+terminal INIT,END,IF,THEN,ELSE,REPEAT,HUNTIL,WHILE,THENWHILE;
+
+//TERMINALES SCRIPTING de variables, STRING YA DECLARADO
+
+terminal Lexema INTEGER_NEGATIVO,INTEGER_POSITIVO,STRING_PARAMETRO,DECIMAL_POSITIVO,DECIMAL_NEGATIVO,BOOLEAN,CARACTER;
+//DIAGONAL YA DECLARADA, SE USARA COMO DIVISION
+terminal MULTIPLICACION,SUMA,RESTA,PUNTO_COMA,DOS_PUNTOS;
+
+terminal LLAVE_ABIERTA,LLAVE_CERRADA;
+
+terminal String OPERADOR_Y,OPERADOR_O,NOT;
+
+
+precedence left MENOR_QUE, MAYOR_QUE;
+
+precedence left SUMA, RESTA;
+precedence left MULTIPLICACION, DIAGONAL;
+
+precedence left IGUAL_IGUAL,DIFERENTE,MENOR_QUE,MENOR_IGUAL,MAYOR_QUE,MAYOR_IGUAL;
+
+precedence left OPERADOR_O,OPERADOR_Y,NOT;
+
+precedence right OPCIONES_BLOQUE, S17;
+
+precedence left CORCHETE_CERRADO, P_SELECT_P_H1_SPAMS;
+precedence left PUNTO_COMA,DOS_PUNTOS,LLAVE_ABIERTA;
+
+start with S0;
+
+//---------------------------------INICIO PARAMETROS--------------------------------------------------
+
+fonts ::= fonts  font  |  font ;
+
+font ::= 
+	FONT_SIZE IGUAL SIZE_PARAMETRO:A {:
+		agregarDatos("FONT_SIZE",A.toString());
+		//System.out.println("FONT_SIZE  "+A.toString());
+		:}
+	|FONT_FAMILY IGUAL FAMILY_PARAMETRO:A {:
+		agregarDatos("FONT_FAMILY",A.toString());
+		//System.out.println("FONT_FAMILY  "+A.toString());
+		:}
+	|TEXT_ALIGN:P IGUAL ALING_PARAMETRO:A {:
+		agregarDatos("TEXT_ALIGN",A.toString());
+		//System.out.println("TEXT_ALIGN  "+A.toString());
+		:}
+	;
+
+icfs ::= icfs icf | icf ;
+
+icf ::= 	
+	ID IGUAL ID_PARAMETRO:A {:
+		agregarDatos("ID",A.toString());
+		//System.out.println("ID  "+A.toString());
+		:}
+	|COLOR IGUAL COLOR_PARAMETRO:A {:
+		agregarDatos("COLOR",A.toString());
+		//System.out.println("Color  "+A.toString());
+		:}
+	|font
+	;
+
+PCIGS ::= | PCIGS CORCHETE_ABIERTO PCIG CORCHETE_CERRADO 
+	|error IGUAL {:
+		//System.out.println("Recupero en PCIGS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PCIGS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PCIGS");
+		:}
+	|error MAYOR_QUE
+	|error MAYOR_QUE S7
+	;
+
+PCIG ::= 
+	ID IGUAL ID_PARAMETRO:A {:
+		agregarDatos("ID",A.toString());
+		//System.out.println("ID "+"  "+A.toString());
+		:}
+	|NAME IGUAL STRING_PARAMETRO:A {:
+		agregarDatos("NAME",A.toString());
+		//System.out.println("NAME  "+A.toString());
+		:}
+	;	
+PLINK ::= |CORCHETE_ABIERTO HREF IGUAL LINK_PARAMETRO:A CORCHETE_CERRADO {:
+			RESULT = A.toString();
+		//System.out.println("HREF  "+A.toString());
+		:}	
+	|error IGUAL {:
+		//System.out.println("Recupero en PLINK");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PLINK");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+PBODY ::= |CORCHETE_ABIERTO:P BACKGROUND IGUAL COLOR_PARAMETRO:A CORCHETE_CERRADO {:
+		agregarDatos("BACKGROUND",A.toString());
+		agregarEtiqueta("C_BODY",Pleft,Pright,null);
+		//System.out.println("BACKGROUND  "+A.toString());
+		:}
+	|error IGUAL {:
+		//System.out.println("Recupero en PBODY");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PBODY");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+
+PINPUTS ::= |PINPUTS CORCHETE_ABIERTO PINPUT CORCHETE_CERRADO 
+	|error IGUAL {:
+		//System.out.println("Recupero en PINPUTS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PCPINPUTSIGS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PINPUTS");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+PINPUT ::= 	
+	icfs 
+	|TYPE IGUAL TYPE_PARAMETRO:A {:
+		agregarDatos("TYPE",A.toString());
+		//System.out.println("TYPE_PARAMETRO  "+A.toString());
+		:}
+	;
+
+PTEXTEAREAS ::= |PTEXTEAREAS CORCHETE_ABIERTO PTEXTEAREA CORCHETE_CERRADO
+	|error IGUAL {:
+		//System.out.println("Recupero en PTEXTEAREAS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PTEXTEAREAS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PTEXTEAREAS");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+PTEXTEAREA ::= 
+	ID IGUAL ID_PARAMETRO:A {:
+		agregarDatos("ID",A.toString());
+		//System.out.println("ID  "+A.toString());
+		:}
+	|COLS IGUAL ENTERO:A {:
+		agregarDatos("COLS",A.toString());
+		//System.out.println("COLS  "+A.toString());
+		:}
+	|ROWS IGUAL ENTERO:A {:
+		agregarDatos("COLS",A.toString());
+		//System.out.println("ROWS  "+A.toString());
+		:}
+	| fonts
+	;
+
+PDIVS ::= |PDIVS CORCHETE_ABIERTO PDIV CORCHETE_CERRADO 
+	|error IGUAL {:
+		//System.out.println("Recupero en PDIVS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PDIVS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PDIVS");
+		:}
+	|error MAYOR_QUE S7
+	;
+PDIV ::= 
+	BACKGROUND IGUAL COLOR_PARAMETRO:A {:
+		agregarDatos("BACKGROUND",A.toString());
+		//System.out.println("BACKGROUND  "+A.toString());
+		:}
+	|icfs;
+
+PIMGS ::= |PIMGS CORCHETE_ABIERTO PIMG CORCHETE_CERRADO 
+	|error IGUAL {:		
+		//System.out.println("Recupero en PIMGS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PIMGS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PIMGS");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+PIMG ::= 
+	ID IGUAL ID_PARAMETRO:A {:
+		agregarDatos("ID",A.toString());
+		//System.out.println("ID  "+A.toString());
+		:}
+	|SRC IGUAL LINK_PARAMETRO:A {:
+		agregarDatos("SRC",A.toString());
+		//System.out.println("SRC  "+A.toString());
+		:}
+	|WIDTH IGUAL TIPOS_SIZE:A {:
+		agregarDatos("WIDTH",A.toString());
+		//System.out.println("WIDTH  "+A.toString());
+		:}
+	|HEIGHT IGUAL TIPOS_SIZE:A {:
+		agregarDatos("HEIGHT",A.toString());
+		//System.out.println("HEIGHT  "+A.toString());
+		:}
+	|ALT IGUAL STRING_PARAMETRO:A {:
+		agregarDatos("ALT",A.toString());
+		//System.out.println("ALT  "+A.toString());
+		:}
+	;
+
+PBUTTONS ::= | PBUTTONS CORCHETE_ABIERTO PBUTTON CORCHETE_CERRADO 
+	|error IGUAL {:
+		//System.out.println("Recupero en PBUTTONS");
+		:}
+	|error CORCHETE_ABIERTO {:
+		//System.out.println("Recupero en PBUTTONS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en PBUTTONS");
+		:}
+	|error MAYOR_QUE S7
+	;
+
+PBUTTON ::= 
+	icfs 
+	|BACKGROUND IGUAL COLOR_PARAMETRO:A {:
+		agregarDatos("BACKGROUND",A.toString());
+		System.out.println("BACKGROUND  "+A.toString());
+		:}
+	|ONCLICK IGUAL NOMBRE_FUNCION_PARAMETRO:A {:
+		agregarDatos("ONCLICK",A.toString());
+		//System.out.println("en 		ONCLICK  "+A.toString());
+		:}
+	;
+
+P_SELECT_P_H1_SPAMS ::= |P_SELECT_P_H1_SPAMS CORCHETE_ABIERTO PPSH CORCHETE_CERRADO
+	|error IGUAL {:
+		//System.out.println("Recupero en P_SELECT_P_H1_SPAMS");
+		:}
+	|error CORCHETE_ABIERTO PPSH{:
+		//System.out.println("Recupero en P_SELECT_P_H1_SPAMS");
+		:}
+	|error CORCHETE_CERRADO {:
+		//System.out.println("Recupero en P_SELECT_P_H1_SPAMS");
+		:}
+	|error MAYOR_QUE S7
+;
+
+PPSH ::= icfs 	
+	;
+
+TIPOS_SIZE ::= SIZE_PARAMETRO:T {:RESULT = T.toString();:} | SIZE_PARAMETRO_IMAGEN:T {:RESULT = T.toString();:};
+
+
+
+
+
+//---------------------------------FIN PARAMETROS--------------------------------------------------
+
+
+S0 ::= S12:P S1  MENOR_QUE DIAGONAL C_GCIC MAYOR_QUE 
+		{:
+			agregarEtiqueta("/C_GCIC",Pleft,Pright,null);
+			//System.out.println("Estructura reconocida");
+		:}
+		|error CORCHETE_ABIERTO
+		|error MAYOR_QUE S1
+	;
+
+
+S12 ::= MENOR_QUE C_GCIC:P PCIGS MAYOR_QUE {:
+		setDatosCig(Pleft,Pright);
+	:}
+	;
+
+S1 ::= S1 S2 | S2 |error MAYOR_QUE S1 ;
+
+S2 ::= S3 | S6 ;
+
+S3 ::= S13 S4:P CIERRE C_HEAD MAYOR_QUE {:
+		agregarEtiqueta("/C_HEAD",Pleft,Pright,null);
+	:}
+	;
+
+S13 ::= MENOR_QUE C_HEAD:P MAYOR_QUE {:
+		agregarEtiqueta("C_HEAD",Pleft,Pright,null);
+	:}
+	;
+
+S4 ::= S4 S5 | S5
+	;
+
+S5 ::= MENOR_QUE C_LINK:P PLINK:A MAYOR_QUE CIERRE C_LINK MAYOR_QUE {:
+			if(A!=null){
+				agregarEtiqueta("C_LINK",Pleft,Pright,A.toString());
+				manejadorEtiquetas.setLink(A.toString());
+			}
+		:}
+	|MENOR_QUE C_TITLE:P MAYOR_QUE TEXTO_ETIQUETA:A CIERRE C_TITLE MAYOR_QUE {:
+			 agregarEtiqueta("C_TITLE",Pleft,Pright,A.toString());
+		:}
+	|error MENOR_QUE S5
+	|error MENOR_QUE {:
+		//System.out.println("Recupero en s5 <");
+		:}
+	|error MAYOR_QUE {:
+		//System.out.println("Recupero en s5 >");
+		:}
+	;
+
+S6 ::= MENOR_QUE C_BODY PBODY MAYOR_QUE S9;
+
+S9 ::= S7 CIERRE C_BODY:P MAYOR_QUE
+	{:agregarEtiqueta("/C_BODY",Pleft,Pright,null);:}
+	|error MAYOR_QUE S7
+	|error TEXTO_ETIQUETA MAYOR_QUE S7;
+
+S7 ::= S7 MENOR_QUE S8 | MENOR_QUE S8 ;
+
+S8 ::=  C_SPAM:P P_SELECT_P_H1_SPAMS MAYOR_QUE OPCION_TEXTO:A CIERRE C_SPAM MAYOR_QUE {:
+			agregarEtiqueta("C_SPAM",Pleft,Pright,A.toString());
+			//System.out.println("Etiqueta spam deberia agregar");
+		:}
+	| C_INPUT:P PINPUTS MAYOR_QUE CIERRE C_INPUT MAYOR_QUE {:			
+			agregarEtiqueta("C_INPUT",Pleft,Pright,null);
+		:}
+	| C_TEXTAREA:P PTEXTEAREAS MAYOR_QUE OPCION_TEXTO:A CIERRE C_TEXTAREA MAYOR_QUE {:
+			System.out.println("Texto area deberia reconocer");
+			agregarEtiqueta("C_TEXTAREA",Pleft,Pright,A.toString());
+		:}
+	|S14:P S9 CIERRE C_SELECT MAYOR_QUE {:
+			agregarEtiqueta("/C_SELECT",Pleft,Pright,null);
+		:}
+	|S11:P S7 CIERRE C_DIV MAYOR_QUE {:
+			//System.out.println("		fin div");
+			agregarEtiqueta("/C_DIV",Pleft,Pright,null);
+		:}
+	| C_IMG:P PIMGS MAYOR_QUE {:
+			agregarEtiqueta("C_IMG",Pleft,Pright,null);
+		:}
+	| C_BR:P MAYOR_QUE {:
+			agregarEtiqueta("C_BR",Pleft,Pright,null);
+		:}
+	| C_BUTTON:P PBUTTONS MAYOR_QUE OPCION_TEXTO:A CIERRE C_BUTTON MAYOR_QUE {:
+			agregarEtiqueta("C_BUTTON",Pleft,Pright,A.toString());
+		:}
+	| C_H1:P P_SELECT_P_H1_SPAMS MAYOR_QUE OPCION_TEXTO:A CIERRE C_H1 MAYOR_QUE {:
+			agregarEtiqueta("C_H1",Pleft,Pright,A.toString());
+		:}
+	| C_P:P P_SELECT_P_H1_SPAMS MAYOR_QUE TEXTO_ETIQUETA:A CIERRE C_P MAYOR_QUE {:
+			agregarEtiqueta("C_P",Pleft,Pright,A.toString());
+		:}
+	| C_SCRIPTING MAYOR_QUE:P S15 CIERRE C_SCRIPTING MAYOR_QUE {:
+			agregarEtiqueta("C_SCRIPTING",Pleft,Pright,null);
+			existeOnload = false;
+			manejadorEtiquetas.manejadorScript().resetBloque();
+			agregarEtiqueta("/C_SCRIPTING",Pleft,Pright,null);
+		:}	
+	|error S7
+	|error MAYOR_QUE S7	
+	|error CORCHETE_CERRADO MAYOR_QUE
+	;
+
+OPCION_TEXTO ::= {:RESULT="";System.out.println("Texto area deberia reconocer nada");:}|TEXTO_ETIQUETA:A {:RESULT=A;System.out.println("Texto area deberia reconocer "+A);:};
+
+
+S14 ::=  C_SELECT:P P_SELECT_P_H1_SPAMS MAYOR_QUE {:
+		agregarEtiqueta("C_SELECT",Pleft,Pright,null);
+	:}
+	;
+
+S9 ::= S9 S10 | S10;
+
+S10 ::= MENOR_QUE C_OPTION:P MAYOR_QUE TEXTO_ETIQUETA:A MENOR_QUE DIAGONAL C_OPTION MAYOR_QUE {:
+		agregarEtiqueta("C_OPTION",Pleft,Pright,A.toString());
+	:}
+	;
+
+S11 ::=  C_DIV:P PDIVS MAYOR_QUE{:
+		//System.out.println("		Inicio div");
+		agregarEtiqueta("C_DIV",Pleft,Pright,null);
+	:}
+	;
+	
+CIERRE ::= MENOR_QUE DIAGONAL;
+
+//agregarLinea(String tipo,String condicion,String inicio,String modo)
+S24 ::= ON_LOAD:A PARENTESIS_ABIERTO PARENTESIS_CERRADO {:
+			if(!existeOnload){
+				manejadorEtiquetas.manejadorScript().setNombreProcedimiento("ON_LOAD");		
+				manejadorEtiquetas.manejadorScript().agregarLinea("ON_LOAD"+contadorOnload,"INICIO_FUNCION",null,null,null);
+				existeOnload = true;
+				contadorOnload++;
+			}else{
+				manejadorEtiquetas.agregarError("Semantico", "Proceso ON_LOAD ya existe en bloque", new int [] {Aleft,Aright});
+			}
+		:}
+	 CORCHETE_ABIERTO S16 CORCHETE_CERRADO
+		{:
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_FUNCION",null,null,null);
+			manejadorEtiquetas.manejadorScript().resetLocales();
+		:}
+		
+	 ;
+
+S15 ::= S25 | S15 S25 
+	|error CORCHETE_ABIERTO S16 CORCHETE_CERRADO	
+	|error PUNTO_COMA
+	;
+
+// |CORCHETE_ABIERTO error CORCHETE_CERRADO | error CORCHETE_CERRADO 
+
+S25 ::= NOMBRE_FUNCION:A PARENTESIS_ABIERTO PARENTESIS_CERRADO{:
+		if(manejadorEtiquetas.manejadorScript().agregoNombreFuncion(A.toString())){
+			manejadorEtiquetas.manejadorScript().setNombreProcedimiento(A.toString());
+			manejadorEtiquetas.manejadorScript().agregarLinea(A.toString(),"INICIO_FUNCION",null,null,null);
+		}else{
+			int posXY [] = {Aleft,Aright};
+			manejadorEtiquetas.agregarError("Semantico", "Id de funcion ya existe "+A.toString(), posXY);
+		}
+		:} 
+		CORCHETE_ABIERTO S16 CORCHETE_CERRADO
+		{:
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_FUNCION",null,null,null);
+			manejadorEtiquetas.manejadorScript().resetLocales();
+		:}
+		|S24
+		|error CORCHETE_CERRADO S15
+	;
+
+S16 ::= S17 | S16 S17 |error PUNTO_COMA S16 |INICIO_BLOQUE error FIN_BLOQUE | error IGUAL S23;
+
+S17 ::= ASIGNACIONES_DECLARACIONES PUNTO_COMA| OPCIONES_IF | WHILE_PROD | REPEAT_PROD | EXIT_PROD PUNTO_COMA| REDIRECT_PROD PUNTO_COMA| ALERT_INFO_PROD PUNTO_COMA | INSERT PARENTESIS_ABIERTO OPCIONES_INSERT PARENTESIS_CERRADO PUNTO_COMA	
+	;
+
+OPCIONES_INSERT ::= OPCION_INSERT COMA OPCIONES_INSERT | OPCION_INSERT;
+
+OPCION_INSERT ::= ID_PARAMETRO_INSERT | ID_VARIABLE;
+
+EXIT_PROD ::= EXIT PARENTESIS_ABIERTO PARENTESIS_CERRADO {:
+		manejadorEtiquetas.manejadorScript().agregarLinea(null,"EXIT",null,null,null);
+	:};
+
+REDIRECT_PROD ::= REDIRECT PARENTESIS_ABIERTO PARENTESIS_CERRADO {:
+		manejadorEtiquetas.manejadorScript().agregarLinea(null,"REDIRECT",null,null,null);
+	:};
+
+ALERT_INFO_PROD ::= ALERT_INFO PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+		if(A.getTipo().equals("STRING")){
+			String valor = getValor(A);
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"ALERT_INFO",null, valor,null);
+		}else{
+			manejadorEtiquetas.agregarError("Semantico","Funcion REVERSE solo recibe parametros",new int[]{Aleft,Aright});
+		}
+	:};
+
+OPCIONES_IF ::= INICIO_IF OPCIONES_BLOQUE 
+			{:
+				manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_IF",null,null,null);
+			:}
+		| INICIO_IF OPCIONES_BLOQUE ELSE  {:
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_IF",null,null,null);
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"INICIO_ELSE",null,null,null);
+		:} OPCIONES_BLOQUE {:
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_ELSE",null,null,null);
+		:};
+
+INICIO_IF ::= IF PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO THEN {:
+		if(A!=null && A.getTipo().equals("BOOLEAN")){
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"INICIO_IF",A.getValor(),null,null);
+		}else{
+			if(!errorSintactco)manejadorEtiquetas.agregarError("Semantico","No se puede hacer condicion "+A.getTipo()+" en un if, su valor "+A.getValor(),new int[]{Aleft,Aright});
+			//else manejadorEtiquetas.agregarError("Semantico","Error irrecuperable en if",new int[]{Aleft+1,Aright});
+		}
+	:};
+
+WHILE_PROD ::= WHILE PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+	if(!errorSintactco){
+			if(A!=null && A.getTipo().equals("BOOLEAN")){
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"INICIO_WHILE",A.getValor(),null,null);
+			}else{
+				if(A!=null)manejadorEtiquetas.agregarError("Semantico","No se puede hacer condicion "+A.getTipo()+" en un while, su valor "+A.getValor(),new int[]{Aleft+1,Aright});
+				else manejadorEtiquetas.agregarError("Semantico","No se puede hacer condicion  en un while",new int[]{Aleft+1,Aright});
+			}
+	}
+		:} THENWHILE OPCIONES_BLOQUE {:
+			manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_WHILE",null,null,null);
+		:}
+		;
+
+REPEAT_PROD ::= REPEAT PARENTESIS_ABIERTO ASIGNACIONES_DECLARACIONES:A PARENTESIS_CERRADO HUNTIL PARENTESIS_ABIERTO S23:B PARENTESIS_CERRADO 
+ {:
+	if(!errorSintactco){
+		if(A!=null && B!=null){
+			if((A[0].equals("INTEGER")||A[0].equals("DECIMAL"))&&(B.getTipo().equals("DECIMAL")||B.getTipo().equals("INTEGER"))){
+				if(A[1]!=null){
+					manejadorEtiquetas.manejadorScript().agregarLinea(A[2],"INICIO_REPEAT",B.getValor(),A[1],null);
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Se debe inicalizar una variable al ingresar a un repeat",new int[]{Aleft,Aright});
+				}
+			}else{				
+				manejadorEtiquetas.agregarError("Semantico","Operacion no valida en un for solo se acepta expresion tipo integer",new int[]{Aleft,Aright});
+			}
+		}else {
+			manejadorEtiquetas.agregarError("Semantico","Error en asignacion|declaracion en REPEAT variable debe inicalizarse ",new int[]{Aleft,Aright});
+		}
+	}else{
+			//manejadorEtiquetas.agregarError("Semantico","Error en irrecuperable en  REPEAT  ",new int[]{Aleft,Aright});
+		}
+	:}
+OPCIONES_BLOQUE {:
+	manejadorEtiquetas.manejadorScript().agregarLinea(null,"FIN_REPEAT",null,null,null);
+	:}
+	;
+
+
+OPCIONES_BLOQUE ::= ASIGNACIONES_DECLARACIONES PUNTO_COMA | EXIT_PROD PUNTO_COMA| REDIRECT_PROD PUNTO_COMA| ALERT_INFO_PROD PUNTO_COMA
+|INICIO_BLOQUE S16 FIN_BLOQUE
+|error LLAVE_CERRADA
+| error DOS_PUNTOS 
+| error END
+| error LLAVE_ABIERTA DOS_PUNTOS S16 DOS_PUNTOS LLAVE_CERRADA END 
+;
+
+INICIO_BLOQUE ::= INIT LLAVE_ABIERTA DOS_PUNTOS;
+
+FIN_BLOQUE ::= DOS_PUNTOS LLAVE_CERRADA END;
+
+ASIGNACIONES_DECLARACIONES ::= ASIGNACION:A {:if(A!=null)RESULT = A;:} | DECLARACION:A {:if(A!=null)RESULT = A;:}
+	|error PUNTO_COMA
+;
+
+DECLARACION ::= S18:A {:RESULT = A;:} ;
+	
+ASIGNACION ::= 	ID_VARIABLE:A IGUAL S23:B {:
+	if(!errorSintactco){
+			Lexema aux = manejadorEtiquetas.manejadorScript().getLexema(A.toString());
+			if(aux!=null){
+				if(B!=null && B.getValor()!=null){
+					if(B.getTipo().equals(aux.getTipo())){
+						//System.out.println("Seteo variable "+A.toString());
+						aux.setValor(B.getValor());
+						String id2 = aux.getNombreVariable();
+						if(id2 == null)id2 = A.toString();
+						//agregarLinea(String tipo,String condicion,String inicio,String modo)
+						String valor = B.getNombreVariable();
+						if(valor == null) valor = B.getValor();
+						manejadorEtiquetas.manejadorScript().agregarLinea(id2,"ASIGNACION",null,valor,null);
+						RESULT = new String [] {B.getTipo(),B.getValor(),A.toString()};
+					}else{
+						manejadorEtiquetas.agregarError("Semantico","No se puede asignar un "+B.getTipo()+" a un "+aux.getTipo(),new int[]{Aleft,Aright});
+					}
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Error en la parte asignada",new int[]{Aleft,Aright});
+				}
+			}else{
+				manejadorEtiquetas.agregarError("Semantico","Variable "+A.toString()+" No existe",new int[]{Aleft,Aright});
+			}
+	}else {
+		RESULT = new String [] {null,"sin operacion por error ","sin operacion por error"};
+	}
+		:}
+	| IGUAL error CORCHETE_CERRADO S15
+		;
+
+S18 ::= TIPOS_DATOS:A S19:B S20:C S22:D {:		
+	if(!errorSintactco){
+		if(!manejadorEtiquetas.manejadorScript().errorOperacion()){
+			String errorAux = manejadorEtiquetas.manejadorScript().errorVariableGlobal(B.toString());
+			if(errorAux!=null){
+				manejadorEtiquetas.agregarError("Semantico","Variable(S): "+errorAux+" globales ya existen",new int[]{Aleft,Aright});
+			}
+			if(D.toString().equals("NO")){
+				//System.out.println("Variable(S) sin asignacion");
+				manejadorEtiquetas.manejadorScript().agregarVariables(A.toString(),B.toString(),lexemaAux,manejadorEtiquetas.getErrores(),new int[]{Aleft+1,Aright+1});
+				if(lexemaAux!=null)RESULT = new String [] {lexemaAux.getTipo(),null,C.toString()};
+			}else{
+				if(lexemaAux!=null){
+				String tipoOperacion = lexemaAux.getTipo();
+				// da el valor de la variable  manejadorEtiquetas.manejadorScript().getOperacion();
+				//System.out.println("Variable(S) con asignacion");
+				//System.out.println("El tipo de dato que subio es "+tipoOperacion);				
+				//System.out.println("Va a comparar "+tipoOperacion+" con "+A.toString());				
+				if(A.toString().equals(tipoOperacion)){
+					manejadorEtiquetas.manejadorScript().agregarVariables(A.toString(),B.toString(),lexemaAux,manejadorEtiquetas.getErrores(),new int[]{Aleft+1,Aright+1});
+					if(lexemaAux!=null)RESULT = new String [] {lexemaAux.getTipo(),lexemaAux.getValor(),C.toString()};
+				}else{
+					//System.out.println("Error en asignacion de variable no coinciden los datos "+A.toString()+" "+tipoOperacion);
+					String aus = "Error en asignacion de variable no coinciden los datos "+A.toString()+" "+tipoOperacion;					
+					manejadorEtiquetas.agregarError("Semantico",aus,new int[]{Aleft,Aright});
+				}
+				}
+			}			
+			//System.out.println("tipo variable :"+A.toString()+" global: "+B.toString()+"  id(s) ");
+		}else{
+			//System.out.println("Error en asignacion de variable");
+		}
+		manejadorEtiquetas.manejadorScript().resetOperacion();
+		lexemaAux = null;
+	}else {
+		RESULT = new String [] {null,"sin operacion por error ","sin operacion por error"};
+	}
+	:}
+	
+	;
+
+S19 ::= {:RESULT="NO";:} | GLOBAL {:RESULT = "SI";:};
+
+S20 ::= S21:A {:if(!errorSintactco)RESULT = A.toString();:}
+	| S20:A COMA S21:B {:if(!errorSintactco)RESULT = A.toString()+","+B.toString();:}
+	|error PUNTO_COMA S16;
+
+S21 ::= ID_VARIABLE:A {:
+		if(!manejadorEtiquetas.manejadorScript().agregarID(A.toString())&&!errorSintactco){
+			manejadorEtiquetas.agregarError("Semantico","Ya existe variable con ese Id "+A.toString(),new int[]{Aleft,Aright});
+		}
+		RESULT = A.toString();	
+	:};
+
+S22 ::= {:RESULT = "NO";:}| IGUAL S23:A {:RESULT = "SI";lexemaAux = A;:}
+	;
+
+S23 ::= S23:A SUMA:C S23:B {:
+			verificadorOperaciones(A,"+",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A RESTA:C S23:B {:
+			verificadorOperaciones(A,"-",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A OPCION_RESTA:B {:
+			B = new Lexema(B.getValor().replaceAll("-", ""),B.getTipo());
+			verificadorOperaciones(A,"-",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A MULTIPLICACION:C S23:B {:
+			verificadorOperaciones(A,"*",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A DIAGONAL:C S23:B {:
+			verificadorOperaciones(A,"/",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A OPERADOR_Y S23:B {:
+			verificadorOperaciones(A,"&&",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A OPERADOR_O S23:B {:
+			verificadorOperaciones(A,"||",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|NOT S23:B {:
+			verificadorOperaciones("!",B,Bleft,Bright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A IGUAL_IGUAL S23:B {:		
+			verificadorOperaciones(A,"==",B,Aleft,Aright);			
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A DIFERENTE S23:B {:
+			verificadorOperaciones(A,"!=",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A MAYOR_IGUAL S23:B {:
+			verificadorOperaciones(A,">=",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A MENOR_IGUAL S23:B {:
+			verificadorOperaciones(A,"<=",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A MENOR_QUE S23:B {:
+			verificadorOperaciones(A,"<",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|S23:A MAYOR_QUE S23:B {:
+			verificadorOperaciones(A,">",B,Aleft,Aright);
+			RESULT = manejadorEtiquetas.manejadorScript().convertirALexema();
+		:}
+	|PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+			if(A!=null)RESULT = new Lexema("("+A.getValor()+")",A.getTipo());
+		:}
+	|PARENTESIS_ABIERTO error PARENTESIS_CERRADO
+	|S26:A {:
+			//System.out.println("Entro a S22 (valor,tipo): "+A.getTipo()+" "+A.getValor());
+			RESULT = A;			
+		:}
+	
+	;
+
+OPCION_RESTA ::= DECIMAL_NEGATIVO:A {:
+			RESULT = A;
+		:}
+		|INTEGER_NEGATIVO:A {:
+			RESULT = A;
+		:};
+
+S26 ::= 
+	DECIMAL_POSITIVO:A {:
+			RESULT = A;
+		:}
+	|DECIMAL_NEGATIVO:A {:
+			RESULT = A;
+		:}
+	|INTEGER_POSITIVO:A {:
+			RESULT = A;
+		:}
+	|INTEGER_NEGATIVO:A {:
+			RESULT = A;
+		:}
+	|STRING_PARAMETRO:A {:
+			RESULT = new Lexema("\""+A.getValor()+"\"",A.getTipo());
+		:}
+	|CARACTER:A {:
+			RESULT = new Lexema("\'"+A.getValor()+"\'",A.getTipo());
+		:}
+	|BOOLEAN:A {:
+			RESULT = A;
+		:}
+	|ID_VARIABLE:A {:
+		if(!errorSintactco){
+			Lexema aux = manejadorEtiquetas.manejadorScript().getLexema(A.toString());			
+			if (aux == null){
+				manejadorEtiquetas.agregarError("Semantico","Variable "+A.toString()+" No existe",new int[]{Aleft,Aright});
+			}else{				
+				if(aux.getValor() == null){
+					manejadorEtiquetas.agregarError("Semantico","Variable "+A.toString()+" No inicializada",new int[]{Aleft,Aright});
+				}
+			}
+			RESULT = aux;
+		}else{
+			RESULT = null;
+		}
+		:}
+		| ASC PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+				if(A.getTipo().equals("STRING")){					
+					RESULT = new Lexema("ASC("+getValor(A)+")",A.getTipo());
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Funcion ASC solo recibe parametros tipo string",new int[]{Aleft,Aright});
+				}
+
+			:}
+		| DESC PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+				if(A.getTipo().equals("STRING")){
+					RESULT = new Lexema("DESC("+getValor(A)+")",A.getTipo());
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Funcion DESC solo recibe parametros tipo string",new int[]{Aleft,Aright});
+				}
+			:}
+		| LETPAR_NUM PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+				if(A.getTipo().equals("STRING")){
+					RESULT = new Lexema("LETPAR_NUM("+getValor(A)+")",A.getTipo());
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Funcion LETPAR_NUM solo recibe parametros tipo string",new int[]{Aleft,Aright});
+				}
+			:}
+		| LETIMPAR_NUM PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+				if(A.getTipo().equals("STRING")){
+					RESULT = new Lexema("LETIMPAR_NUM("+getValor(A)+")",A.getTipo());
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Funcion LETIMPAR_NUM solo recibe parametros tipo string",new int[]{Aleft,Aright});
+				}
+			:}
+		| REVERSE PARENTESIS_ABIERTO S23:A PARENTESIS_CERRADO {:
+				if(A.getTipo().equals("STRING")){
+					RESULT = new Lexema("REVERSE("+getValor(A)+")",A.getTipo());
+				}else{
+					manejadorEtiquetas.agregarError("Semantico","Funcion REVERSE solo recibe parametros tpos string",new int[]{Aleft,Aright});
+				}
+			:}
+		| CARACTER_ALEATORIO PARENTESIS_ABIERTO PARENTESIS_CERRADO {:
+				RESULT = new Lexema("CARACTER_ALEATORIO(1)","CHAR");
+			:}
+		| NUM_ALEATORIO PARENTESIS_ABIERTO PARENTESIS_CERRADO {:
+				RESULT = new Lexema("NUM_ALEATORIO()","INTEGER");
+			:}
+		| GET_ELEMENT_BY_ID PARENTESIS_ABIERTO ID_PARAMETRO_ELEMENT:A PARENTESIS_CERRADO {:								
+				if(!ids.contains(A)){
+					RESULT = new Lexema("document.getElementById(\""+A.trim()+"\").value","STRING");
+				}else{					
+					manejadorEtiquetas.agregarError("Semantico","No existe etiqueta con este id: "+A,new int[]{Aleft,Aright});
+					RESULT = null;
+				}			
+			:}
+	;
