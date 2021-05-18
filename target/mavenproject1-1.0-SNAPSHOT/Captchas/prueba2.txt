@@ -1,0 +1,108 @@
+ <!-- Mi primer captcha
+     en el curso de Organización de Lenguajes y Compiladores 1
+ -->
+<C_GCIC [id= "_captcha_matematico_1"] [name= "Captcha Matemático 1"]>
+    !! El encabezado de la página que tendrá mi captcha
+    <C_HEAD>
+       <C_LINK 
+          !! El link al que redirige mi captcha
+          [href= "https://www.mclibre.org/consultar/htmlcss/html/html-etiquetas.html"]>
+       </C_LINK>
+          !! El título de mi página
+       <C_TITLE> Mi primer Captcha Matemático</C_TITLE>
+    </C_HEAD>
+    !! El cuerpo de la página
+    <C_BODY [background= "#e5e6ea"] >
+        !! un título simple estilizado
+        <C_INPUT></C_INPUT>
+        <C_TEXTAREA></C_TEXTAREA>
+        <C_H1 [id= "_title_1"] [text-align= "center"] [color= "#7eff33"] >
+           Mi primer Captcha Matemático
+        </C_H1>
+        !! Un salto normal
+        <C_br>
+        !! Información de la operación a resolver en el  captcha
+        <C_SPAM [id= "_mostrar_1"] [text-align= "center"] [color= "#3366ff"] >
+           ¿ Qué resultado genera la operación siguiente: 5+5 ?
+        </C_SPAM>
+        !! Input para la Respuesta del usuario generado con un scripting        
+        !! Boton que llama a la funcionalidad calc
+        <C_BUTTON [id= "_mostrar_4"] [onclick= "PROCESS_DAVID()"] [background="green"]>            
+           Procesar...
+        </C_BUTTON> 
+      <C_DIV>
+         <C_H1 [id= "_title_2"] [text-align= "center"] [color= "#7eff33"] >
+           Dato 1 div 
+        </C_H1>
+            <C_DIV>
+               <C_H1 [id= "_title_SUB2"] [text-align= "center"] [color= "#7eff33"] >
+               Dato 1 div 
+            </C_H1>
+            <C_H1 [id= "_title_SUB3"] [text-align= "center"] [color= "#7eff33"] >
+               dato 2 div
+            </C_H1>
+            </C_DIV>
+        <C_H1 [id= "_title_3"] [text-align= "center"] [color= "#7eff33"] >
+           dato 2 div
+        </C_H1>
+      </C_DIV>
+        !! Scripting para la función calc
+        <C_SELECT>
+            <C_OPTION> OPCION1 </C_OPTION>
+            <C_OPTION> OPCION2 </C_OPTION>
+            <C_OPTION> OPCION3 </C_OPTION>
+        </C_SELECT>        
+<C_SCRIPTING>
+ON_LOAD () [
+char aleatorio = CARACTER_ALEATORIO();
+boolean carlos = true;
+boolean @global a,david,marcos = (12-32/2) > 12;
+integer d = -23;
+david = true;
+string @global juan = "carlos"+CARACTER_ALEATORIO();
+]
+PROCESS_DAVID () [
+string @global juan3 = "carlos";
+string @global juan1 = "carlos";
+string @global juan2 = "carlos";
+string @global juan = "carlos";
+string carlos= "carlos";
+carlos = "davod"+NUM_ALEATORIO();
+IF ("abcw"==ASC("cba")) THEN 
+carlos = "ABC";
+ELSE
+carlos = "CBA";
+integer @global contador = 10;
+REPEAT (integer i = 0) HUNTIL (10)
+carlos = "Contador "+i;
+carlos = "abc";
+WHILE (carlos==ASC("cba")) THENWHILE
+carlos = "entro while "+i;
+juan = carlos ;
+REPEAT (integer cont = 0) HUNTIL (15)
+INIT {:
+    carlos = "Contador segundo: "+cont;
+    IF(cont == 5)THEN
+    carlos = "Contador segundo dentro de if true: "+cont;
+    ELSE 
+    INIT {:
+        string aux = " CONCATENO EN ELSE";
+        carlos = aux+"  contador en "+cont;
+        :}END
+:}END
+decimal dec = 12.2+23;
+]
+</C_SCRIPTING>
+<C_SCRIPTING>
+ON_LOAD () [
+boolean carlos = true;
+boolean @global a,david,marcos = (12-32/2) > 12;
+integer @global we = (12+2)*2;
+integer d = -23;
+david = true;
+string @global juan = "carlos";
+]
+</C_SCRIPTING>
+    </C_BODY>
+</C_GCIC>
+!! Fin de estructura GCIC
